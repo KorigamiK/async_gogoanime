@@ -1,44 +1,53 @@
-import requests
-from bs4 import BeautifulSoup as bs
-import subprocess
+import asyncio
+from requests_html import AsyncHTMLSession
 import os
-dir = os.getcwd()
+try:
+    import uvloop
+    asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
+except:
+    pass
+
+dir = os.getcwd()#set it to whatever you want
 if os.path.isdir(dir):
     os.chdir(dir)
 else:
     os.mkdir(dir)
     os.chdir(dir)
-client = requests.Session()
-def get_stream():
-    for i in range(3,7):
-        try:
-            # print(f"https://gogoanime.so/saiki-kusuo-no-ps-nan-tv-episode-{i:d}")
-            res = client.get(f"https://gogoanime.so/rezero-kara-hajimeru-isekai-seikatsu-2nd-season-episode-{i:d}")
-            soup = bs(res.text, "html.parser")
-            yield [soup.find('li', class_="dowloads").a["href"], f'ep_{i:02d}.mp4']
-        except AttributeError:
-            print(f'error {i}')
-            # res = client.get(f"https://gogoanime.so/saiki-kusuo-no-psi-nan-episode-{i:d}")
-            # soup = bs(res.text, "html.parser")
-            # yield soup.find('li', class_="dowloads").a["href"]
+    
+assession = AsyncHTMLSession()
 
-def get_dows(link, name):
-    response = bs(client.get(link).text, "html.parser")
-    links = response.find_all('div', class_="dowload")
-    for i in links:
-        if " ".join(i.a.text.split()) == "Download (360P - mp4)":
-            return [i.a["href"], name]
+async def get_links(link, option):
+    r = await assession.get(link) 
+    # print(r.html.find('a[target="_blank"]')[-1].attrs['href'])
+    file_name = link.split('/')[-1].replace('-', ' ')
+    print(f'starting {file_name}')   
+    stream_page_url = r.html.find('li.dowloads', first=True).find('a', first=True).attrs['href']
+    stream_page = await assession.get(stream_page_url)
+    dow_link = None
+    for i in stream_page.html.find('div.dowload'):
+        if option in i.text:
+            print('done')
+            dow_link = i.search('href="{}"')[0]
+            break
+
+    return (dow_link, file_name)
 
 def downloader(link, output):
-    query=f'wget "{link}" -q --show-progress --no-check-certificate -o {output}'
-    subprocess.run(query,shell=True)
+    print(link, output)
 
-def download():
-# with open("links.txt", "a+") as f:
-    for i in get_stream():
-#         downloader(*get_dows(*i))
-        print(*get_dows(*i))
-        # f.flush()
-
-
-download()
+async def main(link, start, end, quality_option):
+    tasks = []
+    base_url = link.replace(link.split('episode-')[-1], '{}')
+    for i in range(start, end+1):
+        tasks.append(get_links(base_url.format(i), quality_option))
+    dow_links = await asyncio.gather(*tasks)
+    for i in dow_links:
+        # print(*i)
+        downloader(*i)
+        
+    await assession.close()
+    
+loop = assession.loop
+link = 'https://gogoanime.so/k-on-2-episode-1'
+option = '360'
+loop.run_until_complete(main(link, 26, 27, option))
