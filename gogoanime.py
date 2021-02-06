@@ -21,19 +21,22 @@ async def get_links(link, option):
     # print(r.html.find('a[target="_blank"]')[-1].attrs['href'])
     file_name = link.split('/')[-1].replace('-', ' ')
     print(f'starting {file_name}')   
-    stream_page_url = r.html.find('li.dowloads', first=True).find('a', first=True).attrs['href']
-    stream_page = await assession.get(stream_page_url)
-    dow_link = None
-    for i in stream_page.html.find('div.dowload'):
-        if option in i.text:
-            print('done')
-            dow_link = i.search('href="{}"')[0]
-            break
+    try :
+        stream_page_url = r.html.find('li.dowloads', first=True).find('a', first=True).attrs['href']
+        stream_page = await assession.get(stream_page_url)
+        dow_link = None
+        for i in stream_page.html.find('div.dowload'):
+            if option in i.text:
+                print('done')
+                dow_link = i.search('href="{}"')[0]
+                break
 
-    return (dow_link, file_name)
+        return (dow_link, file_name)
+    except Exception as e:
+        raise e
 
 def downloader(link, output):
-    print(link, output)
+    print(f"{output}\n{link}")
 
 async def main(link, start, end, quality_option):
     tasks = []
@@ -42,12 +45,11 @@ async def main(link, start, end, quality_option):
         tasks.append(get_links(base_url.format(i), quality_option))
     dow_links = await asyncio.gather(*tasks)
     for i in dow_links:
-        # print(*i)
         downloader(*i)
         
     await assession.close()
     
 loop = assession.loop
-link = 'https://gogoanime.so/k-on-2-episode-1'
+link = 'https://gogoanime.vc/kobayashi-san-chi-no-maid-dragon-episode-1'
 option = '360'
-loop.run_until_complete(main(link, 26, 27, option))
+loop.run_until_complete(main(link, 1, 14, option))
